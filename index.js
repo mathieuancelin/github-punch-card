@@ -50,7 +50,7 @@ function fetchAllPages(repo, from, to) {
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-function _fetchGithubData(repo, from, to) {
+function fetchGithubData(repo, from, to) {
   return fetchAllPages(repo, from, to).then(data => {
     const commits = Object.keys(data).map(k => {
       const group = data[k];
@@ -59,8 +59,6 @@ function _fetchGithubData(repo, from, to) {
     return commits;
   }, () => []);
 }
-
-const fetchGithubData = _.throttle(_fetchGithubData, 1000);
 
 app.get('/', (req, res) => {
   const repo = req.query.repo || 'facebook/react';
