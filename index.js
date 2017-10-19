@@ -32,6 +32,8 @@ function fetchAllPages(repo, from, to) {
         } else {
           s(commits);
         }
+      }).catch(e => {
+        s([]);
       });
     }
     fetchNext();
@@ -47,7 +49,7 @@ function fetchGithubData(repo, from, to) {
       return { dayStr: days[group[0].day], day: group[0].day, hour: group[0].hour, commits: group.length, y: group[0].day, x: group[0].hour, z: group.length };
     });
     return commits;
-  });
+  }, () => []);
 }
 
 app.get('/', (req, res) => {
@@ -56,7 +58,7 @@ app.get('/', (req, res) => {
   const to = req.query.to ? moment(req.query.to, 'YYYY-MM-DD').startOf('day') : moment().add(1, 'days').startOf('day');
   fetchGithubData(repo, from, to).then(data => {
     res.status(200).type('html').send(view(data, repo, from, to));
-  });
+  }, e => res.status(200).type('html').send('Error !!!'));
 });
 
 app.listen(PORT, () => {
