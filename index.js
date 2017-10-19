@@ -6,13 +6,20 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const TOKEN = process.env.GITHUB_TOKEN;
 
+const cache = {};
+
 function fetchAllPages(repo, from, to) {
+  const key = `https://api.github.com/repos/${repo}/commits?since=${from.format()}&until=${to.format()}`;  
+  if (cache[key]) {
+    return new Promise(s => s(cache[key]));
+  }
+
   let commits = {};
   const pages = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
   return new Promise((s, e) => {
     function fetchNext() {
       const page = pages.shift();
-      const url = `https://api.github.com/repos/${repo}/commits?since=${from.format()}&until=${to.format()}&page=${page}`;
+      const url = `https://api.github.com/repos/${repo}/commits?since=${from.format()}&until=${to.format()}&page=${page}`;      
       fetch(url, {
         headers: {
           'Authorization': `token ${TOKEN}`
@@ -30,6 +37,7 @@ function fetchAllPages(repo, from, to) {
           });
           fetchNext();
         } else {
+          cache[key] = commits;
           s(commits);
         }
       }).catch(e => {
