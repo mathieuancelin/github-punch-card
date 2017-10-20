@@ -6,7 +6,7 @@ you can go to the following address or include the view in any app you want
 https://github-punch-cards.cleverapps.io/?repo=${REPO}&from=${FROM}&to=${TO}
 ```
 
-where $REPO is `owner/repo` on github, and `FROM/TO` date format is `YYYY-MM-DD`. You can also provide a `token` query param with a personnal github token to access private repo.
+where `REPO` is `owner/repo` on github, and `FROM/TO` date format is `YYYY-MM-DD`. You can also provide a `token` query param with a personnal github token to access private repo.
 
 like
 
