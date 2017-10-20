@@ -6,7 +6,14 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const TOKEN = process.env.GITHUB_TOKEN;
 
+// TODO : redis cache ?
+
 const cache = {};
+let limit = 0;
+let remaining = 0;
+let awaitPerCall = 0;
+let reset = moment();
+let duration = moment();
 
 function fetchAllPages(repo, from, to) {
   const key = `https://api.github.com/repos/${repo}/commits?since=${from.format()}&until=${to.format()}`;  
@@ -20,29 +27,45 @@ function fetchAllPages(repo, from, to) {
     function fetchNext() {
       const page = pages.shift();
       const url = `https://api.github.com/repos/${repo}/commits?since=${from.format()}&until=${to.format()}&page=${page}`;      
-      fetch(url, {
-        headers: {
-          'Authorization': `token ${TOKEN}`
-        }
-      }).then(r => {
-        return r.json();
-      }).then(data => {
-        const newCommits = data.map(c => c.commit.author.date).map(date => moment(date)).map(date => ({ day: date.day(), hour: date.hour(), key: `${date.day()} - ${date.hour()}`, value: 1 }));
-        const groups = _.groupBy(newCommits, c => c.key);
-        if (data.length > 0) {
-          Object.keys(groups).map(group => {
-            const arr = (commits[group] || []);
-            const g = (groups[group] || []);
-            commits[group] = [ ...arr, ...g ];
-          });
-          fetchNext();
-        } else {
-          cache[key] = commits;
-          s(commits);
-        }
-      }).catch(e => {
-        s([]);
-      });
+      setTimeout(() => {
+        fetch(url, {
+          headers: {
+            'Authorization': `token ${TOKEN}`
+          }
+        }).then(r => {
+          const headers = r.headers.raw();
+          limit = headers['x-ratelimit-limit'][0];
+          remaining = headers['x-ratelimit-remaining'][0];
+          reset = moment(headers['x-ratelimit-reset'] * 1000);
+          duration = moment.duration(moment().diff(reset));
+          awaitPerCall = (Math.abs(duration.asMilliseconds()) / remaining).toFixed(0);
+          if (awaitPerCall < 0) {
+            awaitPerCall = 0;
+          }
+          if (awaitPerCall > 30000) {
+            console.log('Too much time to await between each call, hoping for the best :(', awaitPerCall);
+            awaitPerCall = 30000;
+          }
+          console.log(remaining, 'calls remaining, will reset at', reset.format('YYYY-MM-DD'), '(ie. ', duration.humanize(), '), need to await', awaitPerCall, 'ms. per call');
+          return r.json();
+        }).then(data => {
+          const newCommits = data.map(c => c.commit.author.date).map(date => moment(date)).map(date => ({ day: date.day(), hour: date.hour(), key: `${date.day()} - ${date.hour()}`, value: 1 }));
+          const groups = _.groupBy(newCommits, c => c.key);
+          if (data.length > 0) {
+            Object.keys(groups).map(group => {
+              const arr = (commits[group] || []);
+              const g = (groups[group] || []);
+              commits[group] = [ ...arr, ...g ];
+            });
+            fetchNext();
+          } else {
+            cache[key] = commits;
+            s(commits);
+          }
+        }).catch(e => {
+          s([]);
+        });
+      }, awaitPerCall);
     }
     fetchNext();
   });
@@ -54,7 +77,7 @@ function fetchGithubData(repo, from, to) {
   return fetchAllPages(repo, from, to).then(data => {
     const commits = Object.keys(data).map(k => {
       const group = data[k];
-      return { dayStr: days[group[0].day], day: group[0].day, hour: group[0].hour, commits: group.length, y: group[0].day, x: group[0].hour, z: group.length };
+      return { dayStr: days[group[0].day], y: group[0].day, x: group[0].hour, z: group.length };
     });
     return commits;
   }, () => []);
@@ -63,20 +86,27 @@ function fetchGithubData(repo, from, to) {
 app.get('/', (req, res) => {
   const repo = req.query.repo || 'facebook/react';
   const from = req.query.from ? moment(req.query.from, 'YYYY-MM-DD').startOf('day') : moment().subtract(8, 'days').startOf('day');
-  const to = req.query.to ? moment(req.query.to, 'YYYY-MM-DD').startOf('day') : moment().add(1, 'days').startOf('day');
+  let to = req.query.to ? moment(req.query.to, 'YYYY-MM-DD').startOf('day') : moment();
+  if (to.isAfter(moment())) {
+    to = moment();
+  }
   fetchGithubData(repo, from, to).then(data => {
     res.status(200).type('html').send(view(data, repo, from, to));
   }, e => res.status(200).type('html').send('Error !!!'));
+});
+
+app.get('/stats.json', (req, res) => {
+  res.status(200).type('json').send(Object.keys(cache));
 });
 
 app.listen(PORT, () => {
   console.log(`PunchCards listening on port ${PORT}!`);
 });
 
-function view(data, project) {
+function view(data, project, from, to) {
   return `<html>
   <head>
-    <title>github-punch-card - ${project}</title>
+    <title>github-punch-card - ${project} - ${from.format('YYYY-MM-DD')} > ${to.format('YYYY-MM-DD')}</title>
     <script src="https://unpkg.com/jquery"></script>
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/highcharts-more.js"></script>
@@ -106,7 +136,7 @@ function view(data, project) {
               enabled: false
             },
             title: {
-              text: '${project}'
+              text: '${project} - ${from.format('YYYY-MM-DD')}/${to.format('YYYY-MM-DD')}'
             },
             xAxis: {
               gridLineWidth: 0,
@@ -157,6 +187,13 @@ function view(data, project) {
         renderChart(githubData);
       });
     </script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-108407029-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'UA-108407029-1');
+    </script>    
   </body>
 </html>`;
 }
