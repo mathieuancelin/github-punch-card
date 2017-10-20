@@ -34,20 +34,22 @@ function fetchAllPages(repo, from, to, token) {
             'Authorization': `token ${token}`
           }
         }).then(r => {
-          const headers = r.headers.raw();
-          limit = headers['x-ratelimit-limit'][0];
-          remaining = headers['x-ratelimit-remaining'][0];
-          reset = moment(headers['x-ratelimit-reset'] * 1000);
-          duration = moment.duration(moment().diff(reset));
-          awaitPerCall = (Math.abs(duration.asMilliseconds()) / remaining).toFixed(0);
-          if (awaitPerCall < 0) {
-            awaitPerCall = 0;
+          if (token === TOKEN) {
+            const headers = r.headers.raw();
+            limit = headers['x-ratelimit-limit'][0];
+            remaining = headers['x-ratelimit-remaining'][0];
+            reset = moment(headers['x-ratelimit-reset'] * 1000);
+            duration = moment.duration(moment().diff(reset));
+            awaitPerCall = (Math.abs(duration.asMilliseconds()) / remaining).toFixed(0);
+            if (awaitPerCall < 0) {
+              awaitPerCall = 0;
+            }
+            if (awaitPerCall > 1000) {
+              console.log('Too much time to await between each call, hoping for the best :(', awaitPerCall);
+              awaitPerCall = 1000;
+            }
+            console.log(remaining, 'calls remaining, will reset at', reset.format('YYYY-MM-DD'), '(ie. in', duration.humanize(), '), need to await', awaitPerCall, 'ms. per call');
           }
-          if (awaitPerCall > 1000) {
-            console.log('Too much time to await between each call, hoping for the best :(', awaitPerCall);
-            awaitPerCall = 1000;
-          }
-          console.log(remaining, 'calls remaining, will reset at', reset.format('YYYY-MM-DD'), '(ie. in', duration.humanize(), '), need to await', awaitPerCall, 'ms. per call');
           return r.json();
         }).then(data => {
           const newCommits = data.map(c => c.commit.author.date).map(date => moment(date)).map(date => ({ day: date.day(), hour: date.hour(), key: `${date.day()} - ${date.hour()}`, value: 1 }));
