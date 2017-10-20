@@ -22,7 +22,7 @@ function fetchAllPages(repo, from, to) {
   }
 
   let commits = {};
-  const pages = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+  const pages = _.range(9999);
   return new Promise((s, e) => {
     function fetchNext() {
       const page = pages.shift();
@@ -42,9 +42,9 @@ function fetchAllPages(repo, from, to) {
           if (awaitPerCall < 0) {
             awaitPerCall = 0;
           }
-          if (awaitPerCall > 30000) {
+          if (awaitPerCall > 1000) {
             console.log('Too much time to await between each call, hoping for the best :(', awaitPerCall);
-            awaitPerCall = 30000;
+            awaitPerCall = 1000;
           }
           console.log(remaining, 'calls remaining, will reset at', reset.format('YYYY-MM-DD'), '(ie. in', duration.humanize(), '), need to await', awaitPerCall, 'ms. per call');
           return r.json();
