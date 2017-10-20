@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 8080;
 const TOKEN = process.env.GITHUB_TOKEN;
 
 // TODO : redis cache ?
+// TODO : support multi repo
 
 const cache = {};
 let limit = 0;
@@ -15,7 +16,7 @@ let awaitPerCall = 0;
 let reset = moment();
 let duration = moment();
 
-function fetchAllPages(repo, from, to) {
+function fetchAllPages(repo, from, to, token) {
   const key = `https://api.github.com/repos/${repo}/commits?since=${from.format()}&until=${to.format()}`;  
   if (cache[key]) {
     return new Promise(s => s(cache[key]));
@@ -30,7 +31,7 @@ function fetchAllPages(repo, from, to) {
       setTimeout(() => {
         fetch(url, {
           headers: {
-            'Authorization': `token ${TOKEN}`
+            'Authorization': `token ${token}`
           }
         }).then(r => {
           const headers = r.headers.raw();
@@ -73,8 +74,8 @@ function fetchAllPages(repo, from, to) {
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-function fetchGithubData(repo, from, to) {
-  return fetchAllPages(repo, from, to).then(data => {
+function fetchGithubData(repo, from, to, token) {
+  return fetchAllPages(repo, from, to, token).then(data => {
     const commits = Object.keys(data).map(k => {
       const group = data[k];
       return { dayStr: days[group[0].day], y: group[0].day, x: group[0].hour, z: group.length };
@@ -84,13 +85,14 @@ function fetchGithubData(repo, from, to) {
 }
 
 app.get('/', (req, res) => {
+  const token = req.query.token || TOKEN;
   const repo = req.query.repo || 'facebook/react';
   const from = req.query.from ? moment(req.query.from, 'YYYY-MM-DD').startOf('day') : moment().subtract(8, 'days').startOf('day');
   let to = req.query.to ? moment(req.query.to, 'YYYY-MM-DD').startOf('day') : moment();
   if (to.isAfter(moment())) {
     to = moment();
   }
-  fetchGithubData(repo, from, to).then(data => {
+  fetchGithubData(repo, from, to, token).then(data => {
     res.status(200).type('html').send(view(data, repo, from, to));
   }, e => res.status(200).type('html').send('Error !!!'));
 });
