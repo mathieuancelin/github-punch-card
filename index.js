@@ -17,7 +17,8 @@ let reset = moment();
 let duration = moment();
 
 function fetchAllPages(repo, from, to, token) {
-  const key = `https://api.github.com/repos/${repo}/commits?since=${from.format()}&until=${to.format()}`;  
+  const key = `https://api.github.com/repos/${repo}/commits?since=${from.format()}&until=${to.format()}`; 
+  console.log('Fetching stats for', key); 
   if (cache[key]) {
     return new Promise(s => s(cache[key]));
   }
