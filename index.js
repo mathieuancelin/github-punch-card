@@ -133,7 +133,11 @@ function view(data, project, from, to) {
             chart: {
               type: 'bubble',
               plotBorderWidth: 1,
-              zoomType: 'xy'
+              zoomType: 'xy',
+              width: window.innerWidth - 15           
+            },
+            exporting: {
+              width: window.innerWidth
             },
             legend: {
               enabled: false
