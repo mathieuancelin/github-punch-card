@@ -46,7 +46,7 @@ function fetchAllPages(repo, from, to) {
             console.log('Too much time to await between each call, hoping for the best :(', awaitPerCall);
             awaitPerCall = 30000;
           }
-          console.log(remaining, 'calls remaining, will reset at', reset.format('YYYY-MM-DD'), '(ie. ', duration.humanize(), '), need to await', awaitPerCall, 'ms. per call');
+          console.log(remaining, 'calls remaining, will reset at', reset.format('YYYY-MM-DD'), '(ie. in', duration.humanize(), '), need to await', awaitPerCall, 'ms. per call');
           return r.json();
         }).then(data => {
           const newCommits = data.map(c => c.commit.author.date).map(date => moment(date)).map(date => ({ day: date.day(), hour: date.hour(), key: `${date.day()} - ${date.hour()}`, value: 1 }));
